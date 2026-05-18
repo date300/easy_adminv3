@@ -6,6 +6,7 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Users from "./pages/Users";
+import Payments from "./pages/Payments";   // ← নতুন import
 
 // ডামি পেজ (পরে আলাদা ফাইল করবে)
 const Deposit = () => <div className="text-2xl font-bold">Deposit Page</div>;
@@ -32,11 +33,12 @@ function App() {
             <Route index element={<Navigate to="/home" replace />} />
             <Route path="home" element={<Home />} />
             <Route path="users" element={<Users />} />
+            <Route path="payments" element={<Payments />} />   {/* ← নতুন route */}
             <Route path="deposit" element={<Deposit />} />
             <Route path="withdraw" element={<Withdraw />} />
           </Route>
 
-          {/* যেকোনো অজানা রুট লগইন পেজে রিডাইরেক্ট করবে (ইচ্ছা করলে দিতে পারো) */}
+          {/* যেকোনো অজানা রুট লগইন পেজে রিডাইরেক্ট করবে */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
@@ -45,3 +47,4 @@ function App() {
 }
 
 export default App;
+

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
-  Menu, X, LayoutDashboard, Users, Wallet, ArrowUpRight,
-  Bell, UserCircle, LogOut, ChevronDown
+  Menu, X, LayoutDashboard, Users, CreditCard, Wallet, ArrowUpRight,
+  Bell, UserCircle, LogOut
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -17,21 +17,23 @@ export default function Layout() {
   };
 
   const menuItems = [
-    { name: "Dashboard", path: "/", icon: <LayoutDashboard size={20} /> },
+    { name: "Dashboard", path: "/home", icon: <LayoutDashboard size={20} /> },
     { name: "Users", path: "/users", icon: <Users size={20} /> },
+    { name: "Payments", path: "/payments", icon: <CreditCard size={20} /> },
     { name: "Deposit", path: "/deposit", icon: <Wallet size={20} /> },
     { name: "Withdraw", path: "/withdraw", icon: <ArrowUpRight size={20} /> },
   ];
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
-      {/* Sidebar – fixed for mobile, static for desktop */}
+      {/* ========== SIDEBAR ========== */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white transform transition-transform duration-300 ease-in-out 
         md:translate-x-0 md:static md:z-auto ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
+        {/* Logo */}
         <div className="h-16 flex items-center justify-between px-6 bg-slate-950/50">
           <span className="text-xl font-black text-sky-400">
             ADMIN<span className="text-white">PANEL</span>
@@ -40,6 +42,8 @@ export default function Layout() {
             <X size={24} />
           </button>
         </div>
+
+        {/* Menu */}
         <nav className="mt-6 px-4 space-y-2">
           {menuItems.map((item) => (
             <NavLink
@@ -69,7 +73,7 @@ export default function Layout() {
         ></div>
       )}
 
-      {/* Main Content */}
+      {/* ========== MAIN CONTENT ========== */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 lg:px-8">
@@ -91,7 +95,6 @@ export default function Layout() {
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
 
-            {/* Admin name & logout – hide name on very small screens */}
             <div className="flex items-center gap-1 sm:gap-3 pl-2 sm:pl-4 border-l">
               <span className="text-sm font-bold text-slate-700 hidden sm:inline">
                 {adminName || "Admin"}
@@ -108,7 +111,7 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Dynamic Page Content */}
+        {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             <Outlet />
@@ -118,3 +121,4 @@ export default function Layout() {
     </div>
   );
 }
+
