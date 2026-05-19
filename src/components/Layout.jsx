@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
-  Menu, X, LayoutDashboard, Users, CreditCard, Wallet, ArrowUpRight,
+  Menu, X, LayoutDashboard, Users, CreditCard, Briefcase, ArrowUpRight,
   Bell, UserCircle, LogOut
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -20,7 +20,7 @@ export default function Layout() {
     { name: "Dashboard", path: "/home", icon: <LayoutDashboard size={20} /> },
     { name: "Users", path: "/users", icon: <Users size={20} /> },
     { name: "Payments", path: "/payments", icon: <CreditCard size={20} /> },
-    { name: "Deposit", path: "/deposit", icon: <Wallet size={20} /> },
+    { name: "Business", path: "/business", icon: <Briefcase size={20} /> },
     { name: "Withdraw", path: "/withdraw", icon: <ArrowUpRight size={20} /> },
   ];
 

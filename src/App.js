@@ -7,9 +7,12 @@ import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Users from "./pages/Users";
 import Payments from "./pages/Payments";   // ← নতুন import
+// এই লাইনটা যোগ করো উপরে
+import Business from "./pages/Business";
 
-// ডামি পেজ (পরে আলাদা ফাইল করবে)
-const Deposit = () => <div className="text-2xl font-bold">Deposit Page</div>;
+
+
+
 const Withdraw = () => <div className="text-2xl font-bold">Withdraw Page</div>;
 
 function App() {
@@ -34,7 +37,7 @@ function App() {
             <Route path="home" element={<Home />} />
             <Route path="users" element={<Users />} />
             <Route path="payments" element={<Payments />} />   {/* ← নতুন route */}
-            <Route path="deposit" element={<Deposit />} />
+            <Route path="business" element={<Business />} />
             <Route path="withdraw" element={<Withdraw />} />
           </Route>
 
