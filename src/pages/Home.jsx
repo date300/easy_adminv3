@@ -9,7 +9,7 @@ export default function Home() {
           <div key={i} className="p-6 bg-white rounded-2xl shadow-sm border border-slate-100">
             <p className="text-sm text-slate-500 font-medium">{item}</p>
             <p className="text-3xl font-bold text-slate-800 mt-2">
-              {i === 0 ? "1,250" : i === 1 ? "$45,200" : "$12,400"}
+              {i === 0 ? "0.00" : i === 1 ? "0.00" : "0.00"}
             </p>
           </div>
         ))}

@@ -6,14 +6,9 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Users from "./pages/Users";
-import Payments from "./pages/Payments";   // ← নতুন import
-// এই লাইনটা যোগ করো উপরে
+import Payments from "./pages/Payments";
 import Business from "./pages/Business";
-
-
-
-
-const Withdraw = () => <div className="text-2xl font-bold">Withdraw Page</div>;
+import Withdraw from "./pages/Withdraw";   // ← নতুন import
 
 function App() {
   return (
@@ -32,13 +27,12 @@ function App() {
               </PrivateRoute>
             }
           >
-            {/* index রুট "/" কে "/home"-এ রিডাইরেক্ট করবে */}
             <Route index element={<Navigate to="/home" replace />} />
             <Route path="home" element={<Home />} />
             <Route path="users" element={<Users />} />
-            <Route path="payments" element={<Payments />} />   {/* ← নতুন route */}
+            <Route path="payments" element={<Payments />} />
             <Route path="business" element={<Business />} />
-            <Route path="withdraw" element={<Withdraw />} />
+            <Route path="withdraw" element={<Withdraw />} />   {/* ← আলাদা component */}
           </Route>
 
           {/* যেকোনো অজানা রুট লগইন পেজে রিডাইরেক্ট করবে */}

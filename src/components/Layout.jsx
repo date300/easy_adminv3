@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Menu, X, LayoutDashboard, Users, CreditCard, Briefcase, ArrowUpRight,
-  Bell, UserCircle, LogOut
+  UserCircle, LogOut
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -90,11 +90,6 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <button className="p-2 text-slate-400 hover:bg-slate-100 rounded-full relative">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-
             <div className="flex items-center gap-1 sm:gap-3 pl-2 sm:pl-4 border-l">
               <span className="text-sm font-bold text-slate-700 hidden sm:inline">
                 {adminName || "Admin"}
