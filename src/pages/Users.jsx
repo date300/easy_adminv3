@@ -265,6 +265,48 @@ function ProductsTab({ data }) {
   );
 }
 
+// ─── Notifications Tab (NEW) ────────────────────────────────────
+function NotificationsTab({ data }) {
+  return (
+    <TabTable
+      cols={["#", "Message (EN)", "Message (BN)", "Amount", "Source", "Read", "Date"]}
+      rows={data}
+      render={(r, i) => [
+        i + 1,
+        <span className="text-xs text-slate-700 max-w-[200px] truncate block">{r.message_en || r.message || "—"}</span>,
+        <span className="text-xs text-slate-700 max-w-[200px] truncate block">{r.message_bn || "—"}</span>,
+        <span className={parseFloat(r.amount_added || 0) < 0 ? "text-red-600 font-semibold" : "text-emerald-600 font-semibold"}>
+          ৳{fmt(r.amount_added)}
+        </span>,
+        <Badge color="indigo">{r.source || "System"}</Badge>,
+        <Badge color={r.is_read ? "green" : "yellow"}>{r.is_read ? "Read" : "Unread"}</Badge>,
+        fmtDT(r.created_at),
+      ]}
+    />
+  );
+}
+
+// ─── Referrals Tab (NEW) ──────────────────────────────────────────
+function ReferralsTab({ data }) {
+  return (
+    <TabTable
+      cols={["#", "Name", "Mobile", "Email", "Code", "Balance", "Voucher", "Status", "Joined"]}
+      rows={data}
+      render={(r, i) => [
+        i + 1,
+        r.full_name,
+        r.mobile,
+        <span className="text-xs text-slate-500">{r.email}</span>,
+        <span className="font-mono text-xs">{r.referral_code}</span>,
+        `৳${fmt(r.balance)}`,
+        `৳${fmt(r.voucher_balance)}`,
+        <Badge color={r.is_active ? "green" : "red"}>{r.is_active ? "Active" : "Inactive"}</Badge>,
+        fmtDate(r.created_at),
+      ]}
+    />
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
@@ -273,6 +315,7 @@ export default function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // debounce helper
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -301,6 +344,12 @@ export default function Users() {
 
   const showToast = (msg, type = "success") => setToast({ msg, type });
   const closeToast = () => setToast(null);
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -339,6 +388,7 @@ export default function Users() {
         }
       } catch (e) {
         console.error(e);
+        showToast("Failed to load user details", "error");
       } finally {
         setDetailLoading(false);
       }
@@ -354,6 +404,7 @@ export default function Users() {
       setDetailData(prev => ({ ...prev, [tab]: json.data || [] }));
     } catch (e) {
       console.error(e);
+      showToast(`Failed to load ${tab}`, "error");
     } finally {
       setDetailLoading(false);
     }
@@ -537,6 +588,12 @@ export default function Users() {
     if (ok) {
       setNotifyModal(false);
       setNotifyForm({ message_en: "", message_bn: "", source: "Admin" });
+      // invalidate notifications cache so next tab open refreshes
+      setDetailData(prev => ({ ...prev, notifications: undefined }));
+      // if currently on notifications tab, refresh immediately
+      if (detailTab === "notifications") {
+        fetchDetail(detailUser.id, "notifications");
+      }
     }
   };
 
@@ -546,6 +603,8 @@ export default function Users() {
       mobile: detailUser.mobile,
       email: detailUser.email,
       id_verified: detailUser.id_verified,
+      is_active: detailUser.is_active,
+      is_matrix_blocked: detailUser.is_matrix_blocked,
     });
     setEditModal(true);
   };
@@ -569,8 +628,8 @@ export default function Users() {
           <input
             type="text"
             placeholder="Search users..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
             className="px-4 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64"
           />
         </div>
@@ -643,7 +702,7 @@ export default function Users() {
         {detailUser && (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-2">
-              {["overview", "income", "payments", "withdraws", "businesses", "products"].map(tab => (
+              {["overview", "income", "payments", "withdraws", "businesses", "products", "notifications", "referrals"].map(tab => (
                 <button
                   key={tab}
                   onClick={() => switchTab(tab)}
@@ -666,6 +725,8 @@ export default function Users() {
                 {detailTab === "withdraws" && <WithdrawsTab data={detailData.withdraws || []} />}
                 {detailTab === "businesses" && <BusinessesTab data={detailData.businesses || []} />}
                 {detailTab === "products" && <ProductsTab data={detailData.products || []} />}
+                {detailTab === "notifications" && <NotificationsTab data={detailData.notifications || []} />}
+                {detailTab === "referrals" && <ReferralsTab data={detailData.referrals || []} />}
               </>
             )}
 
@@ -728,6 +789,26 @@ export default function Users() {
               <option value="verified">Verified</option>
               <option value="rejected">Rejected</option>
             </select>
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={!!editForm.is_active}
+                onChange={e => setEditForm(f => ({ ...f, is_active: e.target.checked }))}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Active
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={!!editForm.is_matrix_blocked}
+                onChange={e => setEditForm(f => ({ ...f, is_matrix_blocked: e.target.checked }))}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Matrix Blocked
+            </label>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setEditModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm">Cancel</button>
