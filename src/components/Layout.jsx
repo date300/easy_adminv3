@@ -20,6 +20,7 @@ export default function Layout() {
     { name: "Dashboard", path: "/home", icon: <LayoutDashboard size={20} /> },
     { name: "Users", path: "/users", icon: <Users size={20} /> },
     { name: "Payments", path: "/payments", icon: <CreditCard size={20} /> },
+    { name: "Product", path: "/product", icon: <CreditCard size={20} /> },
     { name: "Business", path: "/business", icon: <Briefcase size={20} /> },
     { name: "Withdraw", path: "/withdraw", icon: <ArrowUpRight size={20} /> },
   ];

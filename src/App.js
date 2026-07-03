@@ -9,6 +9,7 @@ import Users from "./pages/Users";
 import Payments from "./pages/Payments";
 import Business from "./pages/Business";
 import Withdraw from "./pages/Withdraw";   // ← নতুন import
+import Product from "./pages/Product";
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
             <Route path="users" element={<Users />} />
             <Route path="payments" element={<Payments />} />
             <Route path="business" element={<Business />} />
+            <Route path="product" element={<Product />} />
             <Route path="withdraw" element={<Withdraw />} />   {/* ← আলাদা component */}
           </Route>
 
