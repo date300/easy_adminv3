@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   CheckCircle, XCircle, Wallet, Loader2, RefreshCw,
   History, AlertTriangle, ChevronLeft, ChevronRight,
-  Clock, Search, Filter, Eye, RotateCcw, X, FileText
+  Clock, Filter, Eye, RotateCcw, X, FileText
 } from "lucide-react";
 
 const API_BASE = "https://api.easysarvice.com/api";
@@ -19,22 +19,24 @@ function fmtDate(d) {
 }
 
 function fmtAmount(n) {
-  return "৳" + Number(n).toLocaleString("en-BD");
+  return "৳" + Number(n || 0).toLocaleString("en-BD");
 }
 
 // ─── Badge Components ────────────────────────────────────────────────────────
 
+// ✅ FIX: Added "card" — API now accepts it as a valid method
 const METHOD_COLORS = {
   bkash:  "bg-pink-100 text-pink-700 border-pink-200",
   nagad:  "bg-orange-100 text-orange-700 border-orange-200",
   rocket: "bg-purple-100 text-purple-700 border-purple-200",
   bank:   "bg-blue-100 text-blue-700 border-blue-200",
+  card:   "bg-cyan-100 text-cyan-700 border-cyan-200",
 };
 
+// ✅ FIX: Removed "deposit" — API only accepts "verification" | "voucher"
 const PURPOSE_COLORS = {
   verification: "bg-indigo-100 text-indigo-700 border-indigo-200",
   voucher:      "bg-emerald-100 text-emerald-700 border-emerald-200",
-  deposit:      "bg-amber-100 text-amber-700 border-amber-200",
 };
 
 const STATUS_COLORS = {
@@ -42,6 +44,10 @@ const STATUS_COLORS = {
   approved: "bg-green-100 text-green-700 border-green-200",
   rejected: "bg-red-100 text-red-700 border-red-200",
 };
+
+// Valid values matching API
+const VALID_PURPOSES = ["verification", "voucher"];
+const VALID_STATUSES = ["pending", "approved", "rejected"];
 
 function Badge({ label, colorMap, value }) {
   const cls = colorMap[value?.toLowerCase()] || "bg-slate-100 text-slate-600 border-slate-200";
@@ -78,20 +84,26 @@ function Toast({ msg, type, onClose }) {
 function AuditModal({ token, paymentId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
+    setLoading(true);
+    setErr("");
     fetch(`${API_BASE}/admin/payments/${paymentId}/logs`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
-      .then(d => setData(d))
+      .then(d => {
+        if (d.status === "success") setData(d);
+        else setErr(d.message || "Failed to load logs.");
+      })
+      .catch(() => setErr("Network error."))
       .finally(() => setLoading(false));
   }, [token, paymentId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <FileText size={18} className="text-slate-500" />
@@ -107,12 +119,12 @@ function AuditModal({ token, paymentId, onClose }) {
             <div className="flex justify-center py-10">
               <Loader2 className="animate-spin text-slate-400" size={28} />
             </div>
-          ) : !data || data.status !== "success" ? (
-            <p className="text-red-500 text-sm">Failed to load logs.</p>
+          ) : err ? (
+            <p className="text-red-500 text-sm bg-red-50 px-4 py-3 rounded-xl">{err}</p>
           ) : (
             <>
               {/* Payment Detail */}
-              <div className="bg-slate-50 rounded-xl p-4 mb-6 text-sm space-y-1">
+              <div className="bg-slate-50 rounded-xl p-4 mb-6 text-sm space-y-2">
                 <div className="flex gap-2 flex-wrap">
                   <Badge colorMap={STATUS_COLORS} value={data.payment.status} />
                   <Badge colorMap={PURPOSE_COLORS} value={data.payment.purpose} />
@@ -124,6 +136,7 @@ function AuditModal({ token, paymentId, onClose }) {
                 </p>
                 <p className="font-bold text-slate-800 text-lg">{fmtAmount(data.payment.amount)}</p>
                 <p className="text-slate-500 font-mono text-xs">TrxID: {data.payment.trx_id}</p>
+                <p className="text-slate-400 text-xs">Submitted: {fmtDate(data.payment.created_at)}</p>
               </div>
 
               {/* Timeline */}
@@ -194,7 +207,8 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
     }
   };
 
-  const options = ["approved", "rejected", "pending"].filter(s => s !== payment.status);
+  // ✅ FIX: current status বাদ দিয়ে বাকি valid status দেখাও
+  const options = VALID_STATUSES.filter(s => s !== payment.status);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -210,7 +224,6 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Current state */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <span>
@@ -219,12 +232,10 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
             </span>
           </div>
 
-          {/* User info */}
           <div className="text-sm text-slate-600">
             <span className="font-semibold">{payment.user_name}</span> — {fmtAmount(payment.amount)} ({payment.purpose})
           </div>
 
-          {/* New status */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">নতুন Status</label>
             <div className="flex gap-2">
@@ -248,9 +259,10 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Note */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">কারণ (বাধ্যতামূলক)</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">
+              কারণ <span className="text-red-400">(বাধ্যতামূলক)</span>
+            </label>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
@@ -258,6 +270,7 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
               placeholder="কেন override করছেন তা লিখুন..."
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
             />
+            <p className="text-xs text-slate-400 mt-1">{note.trim().length}/5 minimum</p>
           </div>
 
           {err && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{err}</p>}
@@ -268,8 +281,8 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading}
-              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+              disabled={loading || !newStatus || note.trim().length < 5}
+              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
               Override করুন
@@ -285,11 +298,13 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
 
 function Pagination({ pagination, onPage }) {
   if (!pagination || pagination.pages <= 1) return null;
-  const { page, pages } = pagination;
+  const { page, pages, total, limit } = pagination;
+  const from = (page - 1) * limit + 1;
+  const to   = Math.min(page * limit, total);
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
       <span className="text-xs text-slate-500">
-        Page {page} of {pages} ({pagination.total} records)
+        {from}–{to} of {total} records (Page {page}/{pages})
       </span>
       <div className="flex gap-1">
         <button
@@ -314,21 +329,23 @@ function Pagination({ pagination, onPage }) {
 // ─── PENDING TAB ─────────────────────────────────────────────────────────────
 
 function PendingTab({ token, onToast }) {
-  const [payments, setPayments] = useState([]);
+  const [data, setData] = useState(null);     // { data, pagination }
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState(null);
-  const [filter, setFilter] = useState("all");
+  const [purposeFilter, setPurposeFilter] = useState("all");
   const [auditId, setAuditId] = useState(null);
+  const [page, setPage] = useState(1);
 
-  const fetchPending = useCallback(async () => {
+  // ✅ FIX: fetchPending এখন page নেয়; API-এর pagination response handle করে
+  const fetchPending = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/payments/pending`, {
+      const res = await fetch(`${API_BASE}/admin/payments/pending?page=${p}&limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (data.status === "success") setPayments(data.data || []);
-      else throw new Error(data.message);
+      const json = await res.json();
+      if (json.status === "success") setData(json);
+      else throw new Error(json.message);
     } catch (e) {
       onToast(e.message || "Failed to load", "error");
     } finally {
@@ -336,10 +353,10 @@ function PendingTab({ token, onToast }) {
     }
   }, [token, onToast]);
 
-  useEffect(() => { fetchPending(); }, [fetchPending]);
+  useEffect(() => { fetchPending(1); }, [fetchPending]);
 
   const handleAction = async (paymentId, action) => {
-    if (!window.confirm(`"${action}" করতে চান?`)) return;
+    if (!window.confirm(`Payment "${action}" করতে চান?`)) return;
     setActionId(paymentId);
     try {
       const res = await fetch(`${API_BASE}/admin/approve-payment`, {
@@ -347,12 +364,12 @@ function PendingTab({ token, onToast }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ paymentId, action }),
       });
-      const data = await res.json();
-      if (data.status === "success") {
-        setPayments(prev => prev.filter(p => p.id !== paymentId));
+      const json = await res.json();
+      if (json.status === "success") {
         onToast(`Payment ${action} successfully.`, "success");
+        fetchPending(page); // ✅ same page refresh
       } else {
-        onToast(data.message || "Action failed", "error");
+        onToast(json.message || "Action failed", "error");
       }
     } catch {
       onToast("Network error.", "error");
@@ -361,19 +378,28 @@ function PendingTab({ token, onToast }) {
     }
   };
 
-  const filtered = filter === "all" ? payments : payments.filter(p => p.purpose === filter);
+  const changePage = (p) => {
+    setPage(p);
+    fetchPending(p);
+  };
+
+  const payments = data?.data || [];
+
+  // ✅ FIX: "deposit" purpose filter সরানো হয়েছে — API সাপোর্ট করে না
+  const purposeOptions = ["all", ...VALID_PURPOSES];
+  const filtered = purposeFilter === "all" ? payments : payments.filter(p => p.purpose === purposeFilter);
 
   return (
     <div className="space-y-4">
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          {["all", "verification", "voucher", "deposit"].map(f => (
+          {purposeOptions.map(f => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => setPurposeFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                filter === f ? "bg-slate-800 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                purposeFilter === f ? "bg-slate-800 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
               }`}
             >
               {f}
@@ -384,12 +410,12 @@ function PendingTab({ token, onToast }) {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-1.5 rounded-lg font-semibold">
+          <span className="text-xs bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-1.5 rounded-lg font-semibold">
             <Clock size={12} className="inline mr-1" />
-            {payments.length} pending
+            {data?.pagination?.total ?? 0} pending
           </span>
           <button
-            onClick={fetchPending}
+            onClick={() => fetchPending(page)}
             className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-sky-600 transition-colors"
             title="Refresh"
           >
@@ -405,74 +431,84 @@ function PendingTab({ token, onToast }) {
             <Loader2 className="animate-spin" size={20} /> Loading...
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                <tr>
-                  {["ID", "User", "Method", "Amount", "Trx ID", "Purpose", "Sender", "Date", "Actions"].map(h => (
-                    <th key={h} className="px-4 py-3 whitespace-nowrap font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtered.map(p => (
-                  <tr key={p.id} className="hover:bg-slate-50/70 transition-colors group">
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">#{p.id}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800 text-xs">{p.user_name}</div>
-                      <div className="text-xs text-slate-400">{p.user_email}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge colorMap={METHOD_COLORS} value={p.method} />
-                    </td>
-                    <td className="px-4 py-3 font-bold text-slate-800">{fmtAmount(p.amount)}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{p.trx_id}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge colorMap={PURPOSE_COLORS} value={p.purpose} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500 max-w-[120px] truncate">{p.sender_info}</td>
-                    <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(p.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleAction(p.id, "approved")}
-                          disabled={actionId === p.id}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                        >
-                          {actionId === p.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleAction(p.id, "rejected")}
-                          disabled={actionId === p.id}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                        >
-                          <XCircle size={12} />
-                          Reject
-                        </button>
-                        <button
-                          onClick={() => setAuditId(p.id)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Audit Log"
-                        >
-                          <Eye size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                   <tr>
-                    <td colSpan={9} className="py-14 text-center text-slate-400 text-sm">
-                      {payments.length === 0 ? "কোনো pending payment নেই" : "এই filter-এ কোনো payment নেই"}
-                    </td>
+                    {["ID", "User", "Method", "Amount", "Trx ID", "Purpose", "Sender", "Date", "Actions"].map(h => (
+                      <th key={h} className="px-4 py-3 whitespace-nowrap font-semibold">{h}</th>
+                    ))}
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filtered.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">#{p.id}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-800 text-xs">{p.user_name}</div>
+                        <div className="text-xs text-slate-400">{p.user_email}</div>
+                        {/* ✅ FIX: user_phone → user_phone (API এখন mobile_number AS user_phone দেয়) */}
+                        {p.user_phone && <div className="text-xs text-slate-400">{p.user_phone}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge colorMap={METHOD_COLORS} value={p.method} />
+                      </td>
+                      <td className="px-4 py-3 font-bold text-slate-800">{fmtAmount(p.amount)}</td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{p.trx_id}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge colorMap={PURPOSE_COLORS} value={p.purpose} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500 max-w-[120px] truncate" title={p.sender_info}>
+                        {p.sender_info}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(p.created_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleAction(p.id, "approved")}
+                            disabled={actionId === p.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                          >
+                            {actionId === p.id
+                              ? <Loader2 size={12} className="animate-spin" />
+                              : <CheckCircle size={12} />}
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleAction(p.id, "rejected")}
+                            disabled={actionId === p.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                          >
+                            <XCircle size={12} />
+                            Reject
+                          </button>
+                          <button
+                            onClick={() => setAuditId(p.id)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Audit Log"
+                          >
+                            <Eye size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="py-14 text-center text-slate-400 text-sm">
+                        {payments.length === 0 ? "কোনো pending payment নেই" : "এই filter-এ কোনো payment নেই"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* ✅ FIX: Pending tab এ pagination যোগ হয়েছে */}
+            <Pagination pagination={data?.pagination} onPage={changePage} />
+          </>
         )}
       </div>
 
@@ -483,20 +519,24 @@ function PendingTab({ token, onToast }) {
 
 // ─── HISTORY TAB ─────────────────────────────────────────────────────────────
 
+const INIT_FILTERS = { status: "", purpose: "", userId: "", page: 1 };
+
 function HistoryTab({ token, onToast }) {
-  const [data, setData] = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: "", purpose: "", userId: "", page: 1 });
+  const [filters, setFilters] = useState(INIT_FILTERS);
   const [auditId, setAuditId] = useState(null);
   const [overridePayment, setOverridePayment] = useState(null);
 
-  const fetchHistory = useCallback(async (f = filters) => {
+  // ✅ FIX: useCallback-এ filters dependency নেই — f parameter দিয়ে explicit call হয়
+  //         stale closure সমস্যা দূর হয়েছে
+  const fetchHistory = useCallback(async (f) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (f.status) params.set("status", f.status);
+      if (f.status)  params.set("status", f.status);
       if (f.purpose) params.set("purpose", f.purpose);
-      if (f.userId) params.set("userId", f.userId);
+      if (f.userId)  params.set("userId", f.userId);
       params.set("page", f.page);
       params.set("limit", 15);
 
@@ -511,14 +551,20 @@ function HistoryTab({ token, onToast }) {
     } finally {
       setLoading(false);
     }
-  }, [token, onToast, filters]);
+  }, [token, onToast]);
 
-  useEffect(() => { fetchHistory(); }, []); // initial load
+  // ✅ FIX: initial load — INIT_FILTERS পাঠানো হচ্ছে explicitly
+  useEffect(() => { fetchHistory(INIT_FILTERS); }, [fetchHistory]);
 
   const applyFilter = () => {
     const updated = { ...filters, page: 1 };
     setFilters(updated);
     fetchHistory(updated);
+  };
+
+  const resetFilter = () => {
+    setFilters(INIT_FILTERS);
+    fetchHistory(INIT_FILTERS);
   };
 
   const changePage = (p) => {
@@ -534,9 +580,9 @@ function HistoryTab({ token, onToast }) {
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { key: "pending", label: "Pending", color: "yellow" },
+          { key: "pending",  label: "Pending",  color: "yellow"  },
           { key: "approved", label: "Approved", color: "emerald" },
-          { key: "rejected", label: "Rejected", color: "red" },
+          { key: "rejected", label: "Rejected", color: "red"     },
         ].map(({ key, label, color }) => (
           <div key={key} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-4`}>
             <p className={`text-xs font-semibold text-${color}-600 uppercase tracking-wide`}>{label}</p>
@@ -556,11 +602,13 @@ function HistoryTab({ token, onToast }) {
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
           >
             <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
+            {/* ✅ FIX: VALID_STATUSES থেকে options — hardcode নয় */}
+            {VALID_STATUSES.map(s => (
+              <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
           </select>
         </div>
+
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-slate-500 uppercase">Purpose</label>
           <select
@@ -569,21 +617,25 @@ function HistoryTab({ token, onToast }) {
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
           >
             <option value="">All</option>
-            <option value="verification">Verification</option>
-            <option value="voucher">Voucher</option>
-            <option value="deposit">Deposit</option>
+            {/* ✅ FIX: "deposit" সরানো হয়েছে — API validate করে এবং error দেয় */}
+            {VALID_PURPOSES.map(p => (
+              <option key={p} value={p} className="capitalize">{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+            ))}
           </select>
         </div>
+
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-slate-500 uppercase">User ID</label>
           <input
             type="number"
+            min="1"
             value={filters.userId}
             onChange={e => setFilters(f => ({ ...f, userId: e.target.value }))}
             placeholder="e.g. 42"
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 w-28 focus:outline-none focus:ring-2 focus:ring-sky-300"
           />
         </div>
+
         <button
           onClick={applyFilter}
           className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors"
@@ -591,11 +643,7 @@ function HistoryTab({ token, onToast }) {
           <Filter size={14} /> Filter
         </button>
         <button
-          onClick={() => {
-            const reset = { status: "", purpose: "", userId: "", page: 1 };
-            setFilters(reset);
-            fetchHistory(reset);
-          }}
+          onClick={resetFilter}
           className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-colors"
         >
           Reset
@@ -626,6 +674,8 @@ function HistoryTab({ token, onToast }) {
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-800 text-xs">{p.user_name}</div>
                         <div className="text-xs text-slate-400">{p.user_email}</div>
+                        {/* ✅ FIX: user_phone — API mobile_number AS user_phone দেয় */}
+                        {p.user_phone && <div className="text-xs text-slate-400">{p.user_phone}</div>}
                       </td>
                       <td className="px-4 py-3"><Badge colorMap={METHOD_COLORS} value={p.method} /></td>
                       <td className="px-4 py-3 font-bold text-slate-800">{fmtAmount(p.amount)}</td>
@@ -675,13 +725,18 @@ function HistoryTab({ token, onToast }) {
         )}
       </div>
 
-      {auditId && <AuditModal token={token} paymentId={auditId} onClose={() => setAuditId(null)} />}
+      {auditId && (
+        <AuditModal token={token} paymentId={auditId} onClose={() => setAuditId(null)} />
+      )}
       {overridePayment && (
         <OverrideModal
           token={token}
           payment={overridePayment}
           onClose={() => setOverridePayment(null)}
-          onSuccess={msg => { onToast(msg, "success"); fetchHistory(); }}
+          onSuccess={msg => {
+            onToast(msg, "success");
+            fetchHistory(filters); // ✅ FIX: explicit filters পাঠানো হচ্ছে
+          }}
         />
       )}
     </div>
@@ -690,9 +745,9 @@ function HistoryTab({ token, onToast }) {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-export default function Payments() {
+export default function AdminPayments() {
   const { token } = useAuth();
-  const [tab, setTab] = useState("pending"); // pending | history
+  const [tab, setTab]     = useState("pending");
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((msg, type = "success") => {
@@ -722,26 +777,22 @@ export default function Payments() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => setTab("pending")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-            tab === "pending"
-              ? "bg-white text-slate-800 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Clock size={15} /> Pending
-        </button>
-        <button
-          onClick={() => setTab("history")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-            tab === "history"
-              ? "bg-white text-slate-800 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <History size={15} /> Full History
-        </button>
+        {[
+          { key: "pending", icon: <Clock size={15} />, label: "Pending" },
+          { key: "history", icon: <History size={15} />, label: "Full History" },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              tab === t.key
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
@@ -750,7 +801,6 @@ export default function Payments() {
         : <HistoryTab token={token} onToast={showToast} />
       }
 
-      {/* Toast */}
       {toast && (
         <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
       )}
