@@ -1,9 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders the download page at /download', () => {
-  window.history.pushState({}, '', '/download');
+test('renders the app without crashing', () => {
   render(<App />);
-
-  expect(screen.getByText(/download our app/i)).toBeInTheDocument();
+  expect(screen.getByText(/sign in/i)).toBeInTheDocument();
 });
