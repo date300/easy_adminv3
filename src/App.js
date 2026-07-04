@@ -10,14 +10,16 @@ import Payments from "./pages/Payments";
 import Business from "./pages/Business";
 import Withdraw from "./pages/Withdraw";   // ← নতুন import
 import Product from "./pages/Product";
+import DownloadPage from "./pages/DownloadPage";
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public route: লগইন পেজ */}
+          {/* Public routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/download" element={<DownloadPage />} />
 
           {/* Protected routes: Layout-এর ভিতরে সব প্রটেক্টেড পেজ */}
           <Route
