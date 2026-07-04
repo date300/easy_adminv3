@@ -129,11 +129,6 @@ export default function Login() {
             <p className="text-center text-xs text-slate-500">
               Protected area. Unauthorized access is prohibited.
             </p>
-            <p className="text-center text-sm text-slate-500">
-              <a href="/download" className="font-semibold text-blue-600 hover:text-blue-700">
-                Download our app
-              </a>
-            </p>
           </form>
         </div>
       </div>
