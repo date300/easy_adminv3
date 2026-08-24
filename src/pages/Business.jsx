@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { Briefcase, Loader2, AlertTriangle } from "lucide-react";
 
 export default function Business() {
   const { token } = useAuth();
@@ -47,86 +48,106 @@ export default function Business() {
     }
   };
 
-  if (loading) return <div className="p-6 text-center text-slate-500">Loading businesses...</div>;
-  if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pulse">
+        <Loader2 className="animate-spin text-sky-400 mb-4" size={32} />
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Loading businesses...</span>
+    </div>
+  );
+
+  if (error) return (
+    <div className="p-8 rounded-3xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-bold backdrop-blur-md flex items-center gap-3">
+        <AlertTriangle size={20} />
+        {error}
+    </div>
+  );
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <h2 className="text-lg sm:text-xl font-bold text-slate-800">Business Management</h2>
-        <span className="text-sm text-slate-500">{businesses.length} pending</span>
+    <div className="space-y-8 animate-in fade-in duration-700">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            <Briefcase size={24} className="text-amber-400" />
+            Business List
+        </h1>
+          <p className="text-sm text-slate-400 font-medium">{businesses.length} businesses pending approval</p>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-600 uppercase text-xs">
-            <tr>
-              <th className="px-4 py-3 whitespace-nowrap">ID</th>
-              <th className="px-4 py-3 whitespace-nowrap">Business Name</th>
-              <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">Category</th>
-              <th className="px-4 py-3 whitespace-nowrap hidden md:table-cell">Type</th>
-              <th className="px-4 py-3 whitespace-nowrap">Owner</th>
-              <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">Mobile</th>
-              <th className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">Address</th>
-              <th className="px-4 py-3 whitespace-nowrap">Status</th>
-              <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">Joined</th>
-              <th className="px-4 py-3 whitespace-nowrap">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {businesses.map((biz) => (
-              <tr key={biz.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 font-medium">{biz.id}</td>
-                <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-700">
-                  {biz.business_name}
-                </td>
-                <td className="px-4 py-3 hidden sm:table-cell text-slate-500">{biz.category}</td>
-                <td className="px-4 py-3 hidden md:table-cell text-slate-500">{biz.business_type}</td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="font-medium">{biz.user_name}</div>
-                  <div className="text-xs text-slate-400 hidden sm:block">{biz.user_email}</div>
-                </td>
-                <td className="px-4 py-3 hidden sm:table-cell">{biz.mobile_number || biz.user_mobile}</td>
-                <td className="px-4 py-3 hidden lg:table-cell max-w-[150px] truncate text-slate-500">
-                  {biz.business_address}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-600">
-                    Pending
-                  </span>
-                </td>
-                <td className="px-4 py-3 hidden sm:table-cell text-slate-500 text-xs">
-                  {new Date(biz.created_at).toLocaleDateString("en-GB")}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <button
-                      onClick={() => handleAction(biz.id, "approved")}
-                      disabled={actionLoading !== null}
-                      className="px-2 py-1 sm:px-3 sm:py-1 rounded-md text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
-                    >
-                      {actionLoading === biz.id + "approved" ? "..." : "Approve"}
-                    </button>
-                    <button
-                      onClick={() => handleAction(biz.id, "rejected")}
-                      disabled={actionLoading !== null}
-                      className="px-2 py-1 sm:px-3 sm:py-1 rounded-md text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50"
-                    >
-                      {actionLoading === biz.id + "rejected" ? "..." : "Reject"}
-                    </button>
-                  </div>
-                </td>
+      <div className="bg-white/[0.02] rounded-3xl border border-white/5 overflow-hidden backdrop-blur-xl shadow-2xl">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead>
+              <tr className="bg-white/5 text-slate-500 text-[10px] font-bold">
+                <th className="px-6 py-5 whitespace-nowrap">ID</th>
+                <th className="px-6 py-5 whitespace-nowrap">Name</th>
+                <th className="px-6 py-5 whitespace-nowrap hidden sm:table-cell">Category</th>
+                <th className="px-6 py-5 whitespace-nowrap hidden md:table-cell">Type</th>
+                <th className="px-6 py-5 whitespace-nowrap">Owner</th>
+                <th className="px-6 py-5 whitespace-nowrap hidden lg:table-cell">Address</th>
+                <th className="px-6 py-5 whitespace-nowrap">Status</th>
+                <th className="px-6 py-5 whitespace-nowrap text-right">Actions</th>
               </tr>
-            ))}
-            {businesses.length === 0 && (
-              <tr>
-                <td colSpan={10} className="px-6 py-8 text-center text-slate-400">
-                  No pending businesses found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {businesses.map((biz) => (
+                <tr key={biz.id} className="group hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-5 font-mono text-[10px] text-slate-500 group-hover:text-slate-300">#{biz.id}</td>
+                  <td className="px-6 py-5 whitespace-nowrap">
+                    <div className="font-black text-white text-sm tracking-tight">{biz.business_name}</div>
+                    <div className="text-[9px] font-bold text-sky-400 uppercase tracking-widest mt-1">{biz.mobile_number || biz.user_mobile}</div>
+                  </td>
+                  <td className="px-6 py-5 hidden sm:table-cell">
+                    <span className="text-slate-400 font-bold uppercase tracking-tighter">{biz.category}</span>
+                  </td>
+                  <td className="px-6 py-5 hidden md:table-cell text-slate-500 font-medium">{biz.business_type}</td>
+                  <td className="px-6 py-5 whitespace-nowrap">
+                    <div className="font-black text-white text-[11px] uppercase tracking-wide">{biz.user_name}</div>
+                    <div className="text-[10px] text-slate-500 font-bold tracking-tighter">{biz.user_email}</div>
+                  </td>
+                  <td className="px-6 py-5 hidden lg:table-cell max-w-[150px] truncate text-slate-500 font-medium italic">
+                    {biz.business_address}
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                      Pending
+                    </span>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => handleAction(biz.id, "approved")}
+                        disabled={actionLoading !== null}
+                        className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {actionLoading === biz.id + "approved" ? <Loader2 size={12} className="animate-spin" /> : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => handleAction(biz.id, "rejected")}
+                        disabled={actionLoading !== null}
+                        className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {actionLoading === biz.id + "rejected" ? <Loader2 size={12} className="animate-spin" /> : "Reject"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {businesses.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-6 py-20 text-center opacity-40">
+                    <div className="flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 rounded-3xl border-2 border-dashed border-white/20 flex items-center justify-center mb-4">
+                            <span className="text-2xl">?</span>
+                        </div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">No business requests found</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

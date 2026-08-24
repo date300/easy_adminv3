@@ -10,6 +10,10 @@ import Payments from "./pages/Payments";
 import Business from "./pages/Business";
 import Withdraw from "./pages/Withdraw";   // ← নতুন import
 import Product from "./pages/Product";
+import AdminJobs from "./pages/AdminJobs";
+import RoyaltySalary from "./pages/RoyaltySalary";
+import MatrixFund from "./pages/MatrixFund";
+import AutoMatrixQueue from "./pages/AutoMatrixQueue";
 
 function App() {
   return (
@@ -35,6 +39,10 @@ function App() {
             <Route path="business" element={<Business />} />
             <Route path="product" element={<Product />} />
             <Route path="withdraw" element={<Withdraw />} />   {/* ← আলাদা component */}
+            <Route path="admin/jobs" element={<AdminJobs />} />
+            <Route path="royalty-salary" element={<RoyaltySalary />} />
+            <Route path="matrix-fund" element={<MatrixFund />} />
+            <Route path="matrix-fund/auto-queue" element={<AutoMatrixQueue />} />
           </Route>
 
           {/* যেকোনো অজানা রুট লগইন পেজে রিডাইরেক্ট করবে */}

@@ -1,14 +1,21 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   CheckCircle, XCircle, Wallet, Loader2, RefreshCw,
   History, AlertTriangle, ChevronLeft, ChevronRight,
-  Clock, Filter, Eye, RotateCcw, X, FileText
+  Clock, Filter, Eye, RotateCcw, X, FileText, Copy
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = "https://api.easysarvice.com/api";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+const formatProfilePic = (filename) => {
+    if (!filename) return null;
+    if (filename.startsWith("http")) return filename;
+    return `https://api.easysarvice.com/public/uploads/profile_pics/${filename}`;
+};
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -22,37 +29,39 @@ function fmtAmount(n) {
   return "৳" + Number(n || 0).toLocaleString("en-BD");
 }
 
-// ─── Badge Components ────────────────────────────────────────────────────────
-
-// ✅ FIX: Added "card" — API now accepts it as a valid method
-const METHOD_COLORS = {
-  bkash:  "bg-pink-100 text-pink-700 border-pink-200",
-  nagad:  "bg-orange-100 text-orange-700 border-orange-200",
-  rocket: "bg-purple-100 text-purple-700 border-purple-200",
-  bank:   "bg-blue-100 text-blue-700 border-blue-200",
-  card:   "bg-cyan-100 text-cyan-700 border-cyan-200",
+const copyToClipboard = (text, onToast) => {
+    navigator.clipboard.writeText(text);
+    onToast("Identity captured to clipboard", "success");
 };
 
-// ✅ FIX: Removed "deposit" — API only accepts "verification" | "voucher"
+// ─── Badge Components ────────────────────────────────────────────────────────
+
+const METHOD_COLORS = {
+  bkash:  "bg-pink-500/10 text-pink-400 border-pink-500/20 shadow-[0_0_10px_rgba(236,72,153,0.1)]",
+  nagad:  "bg-orange-500/10 text-orange-400 border-orange-500/20 shadow-[0_0_10px_rgba(249,115,22,0.1)]",
+  rocket: "bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+  bank:   "bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]",
+  card:   "bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.1)]",
+};
+
 const PURPOSE_COLORS = {
-  verification: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  voucher:      "bg-emerald-100 text-emerald-700 border-emerald-200",
+  verification: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-[0_0_10px_rgba(99,102,241,0.1)]",
+  voucher:      "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
 };
 
 const STATUS_COLORS = {
-  pending:  "bg-yellow-100 text-yellow-700 border-yellow-200",
-  approved: "bg-green-100 text-green-700 border-green-200",
-  rejected: "bg-red-100 text-red-700 border-red-200",
+  pending:  "bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)]",
+  approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+  rejected: "bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]",
 };
 
-// Valid values matching API
 const VALID_PURPOSES = ["verification", "voucher"];
 const VALID_STATUSES = ["pending", "approved", "rejected"];
 
 function Badge({ label, colorMap, value }) {
-  const cls = colorMap[value?.toLowerCase()] || "bg-slate-100 text-slate-600 border-slate-200";
+  const cls = colorMap[value?.toLowerCase()] || "bg-white/5 text-slate-400 border-white/10";
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border uppercase tracking-wide ${cls}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${cls}`}>
       {label || value}
     </span>
   );
@@ -67,14 +76,14 @@ function Toast({ msg, type, onClose }) {
   }, [onClose]);
 
   const base = type === "error"
-    ? "bg-red-600 text-white"
-    : "bg-emerald-600 text-white";
+    ? "bg-red-500 shadow-red-500/20"
+    : "bg-emerald-500 shadow-emerald-500/20";
 
   return (
-    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all ${base}`}>
-      {type === "error" ? <AlertTriangle size={16} /> : <CheckCircle size={16} />}
+    <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-xs font-bold transition-all text-white animate-in slide-in-from-bottom-4 duration-300 ${base}`}>
+      {type === "error" ? <AlertTriangle size={14} /> : <CheckCircle size={14} />}
       {msg}
-      <button onClick={onClose}><X size={14} /></button>
+      <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><X size={12} /></button>
     </div>
   );
 }
@@ -89,7 +98,7 @@ function AuditModal({ token, paymentId, onClose }) {
   useEffect(() => {
     setLoading(true);
     setErr("");
-    fetch(`${API_BASE}/admin/payments/${paymentId}/logs`, {
+    fetch(`${API_BASE}/admin/deposit/payment/logs/${paymentId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
@@ -102,65 +111,98 @@ function AuditModal({ token, paymentId, onClose }) {
   }, [token, paymentId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <FileText size={18} className="text-slate-500" />
-            <span className="font-bold text-slate-800">Audit Log — Payment #{paymentId}</span>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-[#121212] border border-white/10 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden relative"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+
+        <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-white/[0.02] relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-sky-500/10 rounded-2xl text-sky-400 border border-sky-500/20 shadow-[0_0_15px_rgba(14,165,233,0.1)]">
+                <FileText size={20} />
+            </div>
+            <div>
+                <span className="font-bold text-white text-sm">Payment Details</span>
+                <p className="text-[10px] text-slate-500 font-bold mt-0.5">ID: #{paymentId}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-            <X size={18} className="text-slate-500" />
+          <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-white transition-all border border-white/5">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="overflow-y-auto flex-1 p-8 custom-scrollbar relative z-10">
           {loading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="animate-spin text-slate-400" size={28} />
+            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+              <Loader2 className="animate-spin text-sky-400 mb-4" size={32} />
+              <span className="text-[10px] font-bold text-slate-500">Scanning Logs...</span>
             </div>
           ) : err ? (
-            <p className="text-red-500 text-sm bg-red-50 px-4 py-3 rounded-xl">{err}</p>
+            <p className="text-red-400 text-xs font-bold bg-red-500/10 border border-red-500/20 px-6 py-4 rounded-2xl text-center">{err}</p>
           ) : (
             <>
               {/* Payment Detail */}
-              <div className="bg-slate-50 rounded-xl p-4 mb-6 text-sm space-y-2">
-                <div className="flex gap-2 flex-wrap">
+              <div className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-8 mb-10 relative overflow-hidden group hover:bg-white/[0.05] transition-colors">
+                <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <Wallet size={100} />
+                </div>
+                <div className="flex gap-2 flex-wrap mb-6 relative z-10">
                   <Badge colorMap={STATUS_COLORS} value={data.payment.status} />
                   <Badge colorMap={PURPOSE_COLORS} value={data.payment.purpose} />
                   <Badge colorMap={METHOD_COLORS} value={data.payment.method} />
                 </div>
-                <p className="text-slate-700 mt-2">
-                  <span className="font-semibold">{data.payment.user_name}</span>
-                  <span className="text-slate-500 ml-1">({data.payment.user_email})</span>
-                </p>
-                <p className="font-bold text-slate-800 text-lg">{fmtAmount(data.payment.amount)}</p>
-                <p className="text-slate-500 font-mono text-xs">TrxID: {data.payment.trx_id}</p>
-                <p className="text-slate-400 text-xs">Submitted: {fmtDate(data.payment.created_at)}</p>
+                <div className="relative z-10">
+                    <p className="text-white text-2xl font-bold tracking-tight mb-1">
+                      {data.payment.user_name}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-bold mb-6">{data.payment.user_email}</p>
+
+                    <div className="flex items-baseline gap-3">
+                        <p className="font-bold text-sky-400 text-4xl tracking-tighter">{fmtAmount(data.payment.amount)}</p>
+                        <span className="text-[10px] font-bold text-slate-600">Amount</span>
+                    </div>
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-6 border-t border-white/5 pt-6 text-[10px] font-bold text-slate-500">
+                    <div>Transaction ID: <span className="text-sky-400 font-mono ml-1">{data.payment.trx_id}</span></div>
+                    <div>Timestamp: <span className="text-slate-300 ml-1">{fmtDate(data.payment.created_at)}</span></div>
+                </div>
               </div>
 
               {/* Timeline */}
               {data.logs.length === 0 ? (
-                <p className="text-slate-400 text-sm text-center py-6">কোনো log পাওয়া যায়নি।</p>
+                <div className="text-center py-10 opacity-30">
+                    <p className="text-[10px] font-bold text-slate-500">Zero Interactions Recorded</p>
+                </div>
               ) : (
-                <div className="relative pl-6 space-y-4">
-                  <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200" />
+                <div className="relative pl-10 space-y-8">
+                  <div className="absolute left-[13px] top-2 bottom-0 w-px bg-white/5" />
                   {data.logs.map((log, i) => (
-                    <div key={i} className="relative">
-                      <div className="absolute -left-[18px] top-1 w-3 h-3 rounded-full border-2 border-white bg-slate-400 shadow" />
-                      <div className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
-                        <div className="flex flex-wrap gap-2 items-center mb-1">
+                    <div key={i} className="relative group/log">
+                      <div className="absolute -left-[37px] top-1.5 w-6 h-6 rounded-full border-4 border-[#121212] bg-[#1a1a1a] flex items-center justify-center transition-all group-hover/log:bg-sky-500 shadow-xl">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-600 transition-all group-hover/log:bg-white" />
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 hover:bg-white/[0.04] transition-all">
+                        <div className="flex flex-wrap gap-4 items-center mb-4">
                           <Badge colorMap={STATUS_COLORS} value={log.from_status} />
-                          <span className="text-slate-400 text-xs">→</span>
+                          <div className="w-4 h-px bg-slate-800" />
                           <Badge colorMap={STATUS_COLORS} value={log.to_status} />
                           {log.admin_name && (
-                            <span className="text-xs text-slate-500 ml-auto">by {log.admin_name}</span>
+                            <span className="text-[10px] font-bold text-slate-500 ml-auto border border-white/5 px-3 py-1 rounded-lg bg-black/20">Agent: {log.admin_name}</span>
                           )}
                         </div>
                         {log.note && (
-                          <p className="text-xs text-slate-600 mt-1 bg-slate-50 rounded px-2 py-1">{log.note}</p>
+                          <div className="p-4 bg-black/40 rounded-2xl border border-white/5 mb-3">
+                            <p className="text-xs text-slate-400 leading-relaxed font-medium italic">"{log.note}"</p>
+                          </div>
                         )}
-                        <p className="text-xs text-slate-400 mt-1">{fmtDate(log.created_at)}</p>
+                        <div className="flex items-center gap-2 text-[9px] font-bold text-slate-600">
+                            <Clock size={10} />
+                            {fmtDate(log.created_at)}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -169,7 +211,7 @@ function AuditModal({ token, paymentId, onClose }) {
             </>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -183,12 +225,12 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
   const [err, setErr] = useState("");
 
   const handleSubmit = async () => {
-    if (!newStatus) return setErr("নতুন status বেছে নিন।");
-    if (note.trim().length < 5) return setErr("কারণ কমপক্ষে ৫ অক্ষরের হতে হবে।");
+    if (!newStatus) return setErr("Target state required.");
+    if (note.trim().length < 5) return setErr("Note must be at least 5 characters.");
     setErr("");
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/payments/${payment.id}/override`, {
+      const res = await fetch(`${API_BASE}/admin/deposit/payment/override/${payment.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ newStatus, note }),
@@ -207,50 +249,65 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
     }
   };
 
-  // ✅ FIX: current status বাদ দিয়ে বাকি valid status দেখাও
   const options = VALID_STATUSES.filter(s => s !== payment.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <RotateCcw size={18} className="text-amber-500" />
-            <span className="font-bold text-slate-800">Override — #{payment.id}</span>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-[#121212] border border-white/10 rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden relative"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+
+        <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-white/[0.02] relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500/10 rounded-2xl text-amber-400 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                <RotateCcw size={20} />
+            </div>
+            <div>
+                <span className="font-bold text-white text-sm">Manual Update</span>
+                <p className="text-[10px] text-slate-500 font-bold mt-0.5">ID: #{payment.id}</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg">
-            <X size={18} className="text-slate-500" />
+          <button onClick={onClose} className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-white transition-all border border-white/5">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <span>
-              বর্তমান status: <strong>{payment.status}</strong>।
-              Override করলে balance/verification স্বয়ংক্রিয় ঠিক হবে।
+        <div className="p-10 space-y-8 relative z-10">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl px-6 py-5 text-[11px] font-bold text-amber-500/90 flex items-start gap-4 backdrop-blur-sm">
+            <AlertTriangle size={20} className="mt-0.5 shrink-0" />
+            <span className="leading-relaxed tracking-wide">
+              Warning: Payment status is <span className="text-white underline">{payment.status.toUpperCase()}</span>.
+              Updating will manually adjust the balance.
             </span>
           </div>
 
-          <div className="text-sm text-slate-600">
-            <span className="font-semibold">{payment.user_name}</span> — {fmtAmount(payment.amount)} ({payment.purpose})
+          <div className="px-8 py-6 rounded-3xl bg-white/[0.03] border border-white/5 flex items-center justify-between group hover:bg-white/[0.05] transition-colors">
+            <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500 mb-1">Target Identity</span>
+                <span className="text-xs font-bold text-white">{payment.user_name}</span>
+            </div>
+            <div className="text-right">
+                <span className="text-[10px] font-bold text-slate-500 mb-1">Impact</span>
+                <span className="text-lg font-bold text-sky-400 block tracking-tighter">{fmtAmount(payment.amount)}</span>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">নতুন Status</label>
-            <div className="flex gap-2">
+            <label className="block text-[10px] font-bold text-slate-500 mb-4 ml-1">Calibrate Target State</label>
+            <div className="flex gap-3">
               {options.map(s => (
                 <button
                   key={s}
                   onClick={() => setNewStatus(s)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all capitalize ${
+                  className={`flex-1 py-4 rounded-2xl text-[10px] font-bold border transition-all duration-300 ${
                     newStatus === s
                       ? s === "approved"
-                        ? "bg-green-600 text-white border-green-600"
-                        : s === "rejected"
-                        ? "bg-red-600 text-white border-red-600"
-                        : "bg-slate-700 text-white border-slate-700"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_10px_20px_rgba(16,185,129,0.2)] scale-[1.02]"
+                        : "bg-red-500 text-white border-red-400 shadow-[0_10px_20px_rgba(239,68,68,0.2)] scale-[1.02]"
+                      : "bg-white/5 text-slate-500 border-white/10 hover:border-white/20 hover:text-white"
                   }`}
                 >
                   {s}
@@ -260,36 +317,29 @@ function OverrideModal({ token, payment, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-              কারণ <span className="text-red-400">(বাধ্যতামূলক)</span>
+            <label className="block text-[10px] font-bold text-slate-500 mb-4 ml-1">
+              Operation Directive <span className="text-red-500/50">*</span>
             </label>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
+              placeholder="Detailed reason for override protocols..."
               rows={3}
-              placeholder="কেন override করছেন তা লিখুন..."
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+              className="w-full px-6 py-5 rounded-3xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 resize-none transition-all hover:bg-white/[0.05]"
             />
-            <p className="text-xs text-slate-400 mt-1">{note.trim().length}/5 minimum</p>
           </div>
 
-          {err && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{err}</p>}
+          {err && <p className="text-red-400 text-[10px] font-bold text-center animate-pulse bg-red-500/5 py-3 rounded-xl border border-red-500/10">{err}</p>}
 
-          <div className="flex gap-3 pt-1">
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50">
-              বাতিল
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !newStatus || note.trim().length < 5}
-              className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-              Override করুন
-            </button>
-          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full py-5 rounded-2xl bg-white text-black text-xs font-bold shadow-2xl hover:bg-sky-400 hover:text-white active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {loading ? "Executing..." : "Confirm Update"}
+          </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -302,24 +352,24 @@ function Pagination({ pagination, onPage }) {
   const from = (page - 1) * limit + 1;
   const to   = Math.min(page * limit, total);
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-      <span className="text-xs text-slate-500">
-        {from}–{to} of {total} records (Page {page}/{pages})
+    <div className="flex items-center justify-between px-8 py-6 border-t border-white/5 bg-white/[0.01] relative z-10">
+      <span className="text-[10px] font-bold text-slate-500">
+        Items {from}–{to} <span className="text-slate-700 mx-2">/</span> Total {total} (Page {page}/{pages})
       </span>
-      <div className="flex gap-1">
+      <div className="flex gap-2">
         <button
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 disabled:opacity-10 transition-all active:scale-90"
         >
-          <ChevronLeft size={15} />
+          <ChevronLeft size={18} />
         </button>
         <button
           disabled={page >= pages}
           onClick={() => onPage(page + 1)}
-          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-500 hover:text-white hover:bg-white/10 disabled:opacity-10 transition-all active:scale-90"
         >
-          <ChevronRight size={15} />
+          <ChevronRight size={18} />
         </button>
       </div>
     </div>
@@ -329,25 +379,24 @@ function Pagination({ pagination, onPage }) {
 // ─── PENDING TAB ─────────────────────────────────────────────────────────────
 
 function PendingTab({ token, onToast }) {
-  const [data, setData] = useState(null);     // { data, pagination }
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState(null);
   const [purposeFilter, setPurposeFilter] = useState("all");
   const [auditId, setAuditId] = useState(null);
   const [page, setPage] = useState(1);
 
-  // ✅ FIX: fetchPending এখন page নেয়; API-এর pagination response handle করে
   const fetchPending = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/payments/pending?page=${p}&limit=20`, {
+      const res = await fetch(`${API_BASE}/admin/deposit/payment/pending?page=${p}&limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
       if (json.status === "success") setData(json);
       else throw new Error(json.message);
     } catch (e) {
-      onToast(e.message || "Failed to load", "error");
+      onToast(e.message || "Protocol error", "error");
     } finally {
       setLoading(false);
     }
@@ -356,23 +405,23 @@ function PendingTab({ token, onToast }) {
   useEffect(() => { fetchPending(1); }, [fetchPending]);
 
   const handleAction = async (paymentId, action) => {
-    if (!window.confirm(`Payment "${action}" করতে চান?`)) return;
+    if (!window.confirm(`Initiate payment ${action} protocol?`)) return;
     setActionId(paymentId);
     try {
-      const res = await fetch(`${API_BASE}/admin/approve-payment`, {
+      const res = await fetch(`${API_BASE}/admin/deposit/payment/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ paymentId, action }),
       });
       const json = await res.json();
       if (json.status === "success") {
-        onToast(`Payment ${action} successfully.`, "success");
-        fetchPending(page); // ✅ same page refresh
+        onToast(`Signal ${action} confirmed.`, "success");
+        fetchPending(page);
       } else {
-        onToast(json.message || "Action failed", "error");
+        onToast(json.message || "Authorization failed", "error");
       }
     } catch {
-      onToast("Network error.", "error");
+      onToast("Network handshake failed.", "error");
     } finally {
       setActionId(null);
     }
@@ -383,136 +432,159 @@ function PendingTab({ token, onToast }) {
     fetchPending(p);
   };
 
-  const payments = data?.data || [];
+  if (loading && !data) return (
+    <div className="flex flex-col items-center justify-center py-32 animate-pulse">
+      <Loader2 className="animate-spin text-sky-400 mb-4" size={40} />
+      <span className="text-[11px] font-bold text-slate-500">Loading...</span>
+    </div>
+  );
 
-  // ✅ FIX: "deposit" purpose filter সরানো হয়েছে — API সাপোর্ট করে না
+  const payments = data?.data || [];
   const purposeOptions = ["all", ...VALID_PURPOSES];
   const filtered = purposeFilter === "all" ? payments : payments.filter(p => p.purpose === purposeFilter);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex p-1 bg-white/5 rounded-2xl border border-white/5 backdrop-blur-md">
           {purposeOptions.map(f => (
             <button
               key={f}
               onClick={() => setPurposeFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                purposeFilter === f ? "bg-slate-800 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              className={`px-6 py-3 rounded-xl text-[10px] font-bold transition-all ${
+                purposeFilter === f ? "bg-white text-black shadow-xl" : "text-slate-500 hover:text-white"
               }`}
             >
               {f}
               {f !== "all" && (
-                <span className="ml-1 opacity-60">({payments.filter(p => p.purpose === f).length})</span>
+                <span className="ml-2 opacity-40 font-bold">[{payments.filter(p => p.purpose === f).length}]</span>
               )}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-1.5 rounded-lg font-semibold">
-            <Clock size={12} className="inline mr-1" />
-            {data?.pagination?.total ?? 0} pending
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="px-6 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400 shadow-xl flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            {data?.pagination?.total ?? 0} Pending Payments
+          </div>
           <button
             onClick={() => fetchPending(page)}
-            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-sky-600 transition-colors"
+            className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition-all hover:bg-white/10 active:scale-90"
             title="Refresh"
           >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
-            <Loader2 className="animate-spin" size={20} /> Loading...
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                  <tr>
-                    {["ID", "User", "Method", "Amount", "Trx ID", "Purpose", "Sender", "Date", "Actions"].map(h => (
-                      <th key={h} className="px-4 py-3 whitespace-nowrap font-semibold">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filtered.map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">#{p.id}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-800 text-xs">{p.user_name}</div>
-                        <div className="text-xs text-slate-400">{p.user_email}</div>
-                        {/* ✅ FIX: user_phone → user_phone (API এখন mobile_number AS user_phone দেয়) */}
-                        {p.user_phone && <div className="text-xs text-slate-400">{p.user_phone}</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge colorMap={METHOD_COLORS} value={p.method} />
-                      </td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{fmtAmount(p.amount)}</td>
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{p.trx_id}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge colorMap={PURPOSE_COLORS} value={p.purpose} />
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-[120px] truncate" title={p.sender_info}>
-                        {p.sender_info}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(p.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleAction(p.id, "approved")}
-                            disabled={actionId === p.id}
-                            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                          >
-                            {actionId === p.id
-                              ? <Loader2 size={12} className="animate-spin" />
-                              : <CheckCircle size={12} />}
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleAction(p.id, "rejected")}
-                            disabled={actionId === p.id}
-                            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
-                          >
-                            <XCircle size={12} />
-                            Reject
-                          </button>
-                          <button
-                            onClick={() => setAuditId(p.id)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Audit Log"
-                          >
-                            <Eye size={14} />
-                          </button>
+      <div className="bg-white/[0.02] rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden backdrop-blur-xl">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs text-left">
+            <thead>
+              <tr className="bg-white/5 text-slate-500 text-[10px] font-bold">
+                <th className="px-8 py-5">ID</th>
+                <th className="px-8 py-5">User</th>
+                <th className="px-8 py-5">Method</th>
+                <th className="px-8 py-5">Amount</th>
+                <th className="px-8 py-5">Transaction ID</th>
+                <th className="px-8 py-5">Purpose</th>
+                <th className="px-8 py-5">Sender Info</th>
+                <th className="px-8 py-5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filtered.map(p => (
+                <tr key={p.id} className="group hover:bg-white/[0.02] transition-colors">
+                  <td className="px-8 py-6 font-mono text-[10px] text-slate-500 group-hover:text-slate-300">#{p.id}</td>
+                  <td className="px-8 py-6 whitespace-nowrap">
+                    <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center overflow-hidden shadow-xl">
+                            {p.profile_picture ? (
+                                <img src={formatProfilePic(p.profile_picture)} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-sky-400 font-bold text-sm">{(p.user_name || "?").charAt(0)}</span>
+                            )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="py-14 text-center text-slate-400 text-sm">
-                        {payments.length === 0 ? "কোনো pending payment নেই" : "এই filter-এ কোনো payment নেই"}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {/* ✅ FIX: Pending tab এ pagination যোগ হয়েছে */}
-            <Pagination pagination={data?.pagination} onPage={changePage} />
-          </>
-        )}
+                        <div>
+                            <div className="font-bold text-white text-sm tracking-tight">{p.user_name}</div>
+                            <div className="text-[10px] text-slate-500 font-bold mt-0.5">{p.user_email}</div>
+                            {p.user_phone && (
+                                <div className="flex items-center gap-2 group/copy mt-1.5 cursor-pointer" onClick={() => copyToClipboard(p.user_phone, onToast)}>
+                                    <div className="text-[9px] text-slate-600 font-bold transition-colors group-hover/copy:text-sky-400">{p.user_phone}</div>
+                                    <Copy size={10} className="text-slate-700 opacity-0 group-hover/copy:opacity-100 transition-all" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <Badge colorMap={METHOD_COLORS} value={p.method} />
+                  </td>
+                  <td className="px-8 py-6 font-bold text-white text-base tracking-tighter">{fmtAmount(p.amount)}</td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-2 group/copy cursor-pointer" onClick={() => copyToClipboard(p.trx_id, onToast)}>
+                        <span className="font-mono text-[10px] bg-white/5 text-sky-400 px-2.5 py-1.5 rounded-lg border border-white/5 transition-all group-hover/copy:bg-sky-500/10">{p.trx_id}</span>
+                        <Copy size={12} className="text-slate-600 opacity-0 group-hover/copy:opacity-100 transition-all" />
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <Badge colorMap={PURPOSE_COLORS} value={p.purpose} />
+                  </td>
+                  <td className="px-8 py-6">
+                    <p className="text-[10px] text-slate-500 font-bold max-w-[150px] truncate" title={p.sender_info}>
+                      {p.sender_info || "—"}
+                    </p>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center justify-end gap-2.5">
+                      <button
+                        onClick={() => handleAction(p.id, "approved")}
+                        disabled={actionId === p.id}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-bold hover:bg-emerald-400 transition-all disabled:opacity-50 shadow-lg shadow-emerald-500/20 active:scale-95"
+                      >
+                        {actionId === p.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={14} />}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleAction(p.id, "rejected")}
+                        disabled={actionId === p.id}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-[10px] font-bold hover:bg-red-500/20 transition-all disabled:opacity-50 active:scale-95"
+                      >
+                        <XCircle size={14} />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => setAuditId(p.id)}
+                        className="p-2.5 text-slate-500 hover:text-white bg-white/5 border border-white/10 rounded-xl transition-all"
+                        title="Audit Log"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-32 text-center opacity-30">
+                    <div className="flex flex-col items-center">
+                        <Clock size={64} className="mb-4" />
+                        <p className="text-xs font-bold">No pending payments found</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <Pagination pagination={data?.pagination} onPage={changePage} />
       </div>
 
-      {auditId && <AuditModal token={token} paymentId={auditId} onClose={() => setAuditId(null)} />}
+      <AnimatePresence>
+        {auditId && <AuditModal token={token} paymentId={auditId} onClose={() => setAuditId(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -528,8 +600,6 @@ function HistoryTab({ token, onToast }) {
   const [auditId, setAuditId] = useState(null);
   const [overridePayment, setOverridePayment] = useState(null);
 
-  // ✅ FIX: useCallback-এ filters dependency নেই — f parameter দিয়ে explicit call হয়
-  //         stale closure সমস্যা দূর হয়েছে
   const fetchHistory = useCallback(async (f) => {
     setLoading(true);
     try {
@@ -540,20 +610,19 @@ function HistoryTab({ token, onToast }) {
       params.set("page", f.page);
       params.set("limit", 15);
 
-      const res = await fetch(`${API_BASE}/admin/payments?${params}`, {
+      const res = await fetch(`${API_BASE}/admin/deposit/payment/history?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
       if (json.status === "success") setData(json);
       else throw new Error(json.message);
     } catch (e) {
-      onToast(e.message || "Failed to load history", "error");
+      onToast(e.message || "Sync failure", "error");
     } finally {
       setLoading(false);
     }
   }, [token, onToast]);
 
-  // ✅ FIX: initial load — INIT_FILTERS পাঠানো হচ্ছে explicitly
   useEffect(() => { fetchHistory(INIT_FILTERS); }, [fetchHistory]);
 
   const applyFilter = () => {
@@ -576,135 +645,161 @@ function HistoryTab({ token, onToast }) {
   const summary = data?.summary || {};
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8 animate-in fade-in duration-500">
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {[
-          { key: "pending",  label: "Pending",  color: "yellow"  },
-          { key: "approved", label: "Approved", color: "emerald" },
-          { key: "rejected", label: "Rejected", color: "red"     },
-        ].map(({ key, label, color }) => (
-          <div key={key} className={`bg-${color}-50 border border-${color}-200 rounded-xl p-4`}>
-            <p className={`text-xs font-semibold text-${color}-600 uppercase tracking-wide`}>{label}</p>
-            <p className={`text-2xl font-bold text-${color}-700 mt-1`}>{summary[key]?.count ?? 0}</p>
-            <p className={`text-xs text-${color}-500 mt-0.5`}>{fmtAmount(summary[key]?.total ?? 0)}</p>
+          { key: "pending",  label: "Pending",  color: "amber", icon: <Clock size={16} />  },
+          { key: "approved", label: "Approved", color: "emerald", icon: <CheckCircle size={16} /> },
+          { key: "rejected", label: "Rejected", color: "red", icon: <XCircle size={16} /> },
+        ].map(({ key, label, color, icon }) => (
+          <div key={key} className={`group relative overflow-hidden rounded-[2rem] border border-${color}-500/20 bg-gradient-to-br from-${color}-500/10 to-transparent p-6 backdrop-blur-xl transition-all hover:scale-[1.02]`}>
+            <div className={`p-2.5 rounded-xl bg-white/5 text-${color}-400 border border-white/5 w-fit mb-4`}>
+                {icon}
+            </div>
+            <p className="text-[10px] font-bold text-slate-500">{label}</p>
+            <p className="mt-2 text-3xl font-bold text-white tracking-tighter">{summary[key]?.count ?? 0}</p>
+            <p className={`mt-1 text-[11px] font-bold text-${color}-400/80 tracking-tight`}>{fmtAmount(summary[key]?.total ?? 0)} Total</p>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-4 flex flex-wrap gap-3 items-end shadow-sm">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
+      <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-8 flex flex-wrap gap-6 items-end shadow-2xl backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+
+        <div className="flex flex-col gap-2 relative z-10">
+          <label className="text-[10px] font-bold text-slate-500 ml-1">Status</label>
           <select
             value={filters.status}
             onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            className="bg-white/[0.03] border border-white/10 rounded-xl px-5 py-3.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 min-w-[140px] appearance-none cursor-pointer hover:bg-white/[0.05]"
           >
-            <option value="">All</option>
-            {/* ✅ FIX: VALID_STATUSES থেকে options — hardcode নয় */}
+            <option value="" className="bg-[#121212]">ALL STATUSES</option>
             {VALID_STATUSES.map(s => (
-              <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              <option key={s} value={s} className="bg-[#121212] font-bold">{s.toUpperCase()}</option>
             ))}
           </select>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-500 uppercase">Purpose</label>
+        <div className="flex flex-col gap-2 relative z-10">
+          <label className="text-[10px] font-bold text-slate-500 ml-1">Purpose</label>
           <select
             value={filters.purpose}
             onChange={e => setFilters(f => ({ ...f, purpose: e.target.value }))}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            className="bg-white/[0.03] border border-white/10 rounded-xl px-5 py-3.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 min-w-[160px] appearance-none cursor-pointer hover:bg-white/[0.05]"
           >
-            <option value="">All</option>
-            {/* ✅ FIX: "deposit" সরানো হয়েছে — API validate করে এবং error দেয় */}
+            <option value="" className="bg-[#121212]">ALL PURPOSES</option>
             {VALID_PURPOSES.map(p => (
-              <option key={p} value={p} className="capitalize">{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+              <option key={p} value={p} className="bg-[#121212] font-bold">{p.toUpperCase()}</option>
             ))}
           </select>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-slate-500 uppercase">User ID</label>
+        <div className="flex flex-col gap-2 relative z-10">
+          <label className="text-[10px] font-bold text-slate-500 ml-1">User ID</label>
           <input
             type="number"
             min="1"
             value={filters.userId}
             onChange={e => setFilters(f => ({ ...f, userId: e.target.value }))}
-            placeholder="e.g. 42"
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 w-28 focus:outline-none focus:ring-2 focus:ring-sky-300"
+            placeholder="ID..."
+            className="bg-white/[0.03] border border-white/10 rounded-xl px-5 py-3.5 text-xs text-white placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 w-32 hover:bg-white/[0.05]"
           />
         </div>
 
-        <button
-          onClick={applyFilter}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors"
-        >
-          <Filter size={14} /> Filter
-        </button>
-        <button
-          onClick={resetFilter}
-          className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-colors"
-        >
-          Reset
-        </button>
+        <div className="flex gap-3 relative z-10 ml-auto w-full md:w-auto">
+            <button
+                onClick={applyFilter}
+                className="flex-1 md:flex-none flex items-center justify-center gap-3 px-10 py-3.5 bg-sky-500 text-white rounded-xl text-[10px] font-bold hover:bg-sky-400 transition-all shadow-xl shadow-sky-500/20 active:scale-95"
+            >
+                <Filter size={14} /> Search
+            </button>
+            <button
+                onClick={resetFilter}
+                className="p-3.5 border border-white/10 bg-white/5 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+                title="Reset Filters"
+            >
+                <RefreshCw size={16} />
+            </button>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
-            <Loader2 className="animate-spin" size={20} /> Loading...
-          </div>
+      <div className="bg-white/[0.02] rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden backdrop-blur-xl">
+        {loading && !data ? (
+            <div className="flex flex-col items-center justify-center py-32 animate-pulse">
+                <Loader2 className="animate-spin text-sky-400 mb-4" size={40} />
+                <span className="text-[11px] font-bold text-slate-500">Loading...</span>
+            </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-                  <tr>
-                    {["ID", "User", "Method", "Amount", "Purpose", "Status", "Last Action", "Date", "Actions"].map(h => (
-                      <th key={h} className="px-4 py-3 whitespace-nowrap font-semibold">{h}</th>
-                    ))}
+              <table className="min-w-full text-xs text-left">
+                <thead>
+                  <tr className="bg-white/5 text-slate-500 text-[10px] font-bold">
+                    <th className="px-8 py-5">ID</th>
+                    <th className="px-8 py-5">User</th>
+                    <th className="px-8 py-5">Method</th>
+                    <th className="px-8 py-5">Amount</th>
+                    <th className="px-8 py-5">Transaction ID</th>
+                    <th className="px-8 py-5">Purpose</th>
+                    <th className="px-8 py-5">Status</th>
+                    <th className="px-8 py-5">Admin</th>
+                    <th className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-white/5">
                   {(data?.data || []).map(p => (
-                    <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">#{p.id}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-800 text-xs">{p.user_name}</div>
-                        <div className="text-xs text-slate-400">{p.user_email}</div>
-                        {/* ✅ FIX: user_phone — API mobile_number AS user_phone দেয় */}
-                        {p.user_phone && <div className="text-xs text-slate-400">{p.user_phone}</div>}
+                    <tr key={p.id} className="group hover:bg-white/[0.02] transition-colors">
+                      <td className="px-8 py-6 font-mono text-[10px] text-slate-500 group-hover:text-slate-300">#{p.id}</td>
+                      <td className="px-8 py-6 whitespace-nowrap">
+                        <div className="flex items-center gap-4">
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center overflow-hidden shadow-xl">
+                                {p.profile_picture ? (
+                                    <img src={formatProfilePic(p.profile_picture)} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="text-sky-400 font-bold text-sm">{(p.user_name || "?").charAt(0)}</span>
+                                )}
+                            </div>
+                            <div>
+                                <div className="font-bold text-white text-sm tracking-tight">{p.user_name}</div>
+                                <div className="text-[10px] text-slate-500 font-bold mt-0.5">{p.user_email}</div>
+                            </div>
+                        </div>
                       </td>
-                      <td className="px-4 py-3"><Badge colorMap={METHOD_COLORS} value={p.method} /></td>
-                      <td className="px-4 py-3 font-bold text-slate-800">{fmtAmount(p.amount)}</td>
-                      <td className="px-4 py-3"><Badge colorMap={PURPOSE_COLORS} value={p.purpose} /></td>
-                      <td className="px-4 py-3"><Badge colorMap={STATUS_COLORS} value={p.status} /></td>
-                      <td className="px-4 py-3">
+                      <td className="px-8 py-6"><Badge colorMap={METHOD_COLORS} value={p.method} /></td>
+                      <td className="px-8 py-6 font-bold text-white text-base tracking-tighter">{fmtAmount(p.amount)}</td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2 group/copy cursor-pointer" onClick={() => copyToClipboard(p.trx_id, onToast)}>
+                            <span className="font-mono text-[10px] bg-white/5 text-sky-400 px-2.5 py-1.5 rounded-lg border border-white/5">{p.trx_id}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6"><Badge colorMap={PURPOSE_COLORS} value={p.purpose} /></td>
+                      <td className="px-8 py-6"><Badge colorMap={STATUS_COLORS} value={p.status} /></td>
+                      <td className="px-8 py-6 whitespace-nowrap">
                         {p.last_action ? (
                           <div>
-                            <span className="text-xs text-slate-600">{p.last_admin_name || "admin"}</span>
-                            <div className="text-xs text-slate-400">{fmtDate(p.last_action_at)}</div>
+                            <span className="text-[10px] font-bold text-white">{p.last_admin_name || "SYSTEM"}</span>
+                            <div className="text-[9px] text-slate-500 font-bold mt-1">{fmtDate(p.last_action_at)}</div>
                           </div>
-                        ) : <span className="text-slate-300 text-xs">—</span>}
+                        ) : <span className="text-slate-800 font-bold">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(p.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center justify-end gap-2.5">
                           <button
                             onClick={() => setAuditId(p.id)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Audit Log"
+                            className="p-2.5 text-slate-500 hover:text-white bg-white/5 border border-white/10 rounded-xl transition-all"
+                            title="Logs"
                           >
-                            <Eye size={14} />
+                            <Eye size={16} />
                           </button>
                           <button
                             onClick={() => setOverridePayment(p)}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Override"
+                            className="p-2.5 text-slate-500 hover:text-amber-400 bg-white/5 border border-white/10 rounded-xl transition-all"
+                            title="Update"
                           >
-                            <RotateCcw size={14} />
+                            <RotateCcw size={16} />
                           </button>
                         </div>
                       </td>
@@ -712,8 +807,11 @@ function HistoryTab({ token, onToast }) {
                   ))}
                   {(data?.data || []).length === 0 && (
                     <tr>
-                      <td colSpan={9} className="py-14 text-center text-slate-400 text-sm">
-                        কোনো payment পাওয়া যায়নি
+                      <td colSpan={9} className="py-32 text-center opacity-30">
+                        <div className="flex flex-col items-center">
+                            <History size={64} className="mb-4" />
+                            <p className="text-xs font-bold">No history found</p>
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -725,20 +823,22 @@ function HistoryTab({ token, onToast }) {
         )}
       </div>
 
-      {auditId && (
-        <AuditModal token={token} paymentId={auditId} onClose={() => setAuditId(null)} />
-      )}
-      {overridePayment && (
-        <OverrideModal
-          token={token}
-          payment={overridePayment}
-          onClose={() => setOverridePayment(null)}
-          onSuccess={msg => {
-            onToast(msg, "success");
-            fetchHistory(filters); // ✅ FIX: explicit filters পাঠানো হচ্ছে
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {auditId && (
+            <AuditModal token={token} paymentId={auditId} onClose={() => setAuditId(null)} />
+        )}
+        {overridePayment && (
+            <OverrideModal
+            token={token}
+            payment={overridePayment}
+            onClose={() => setOverridePayment(null)}
+            onSuccess={msg => {
+                onToast(msg, "success");
+                fetchHistory(filters);
+            }}
+            />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -754,57 +854,68 @@ export default function AdminPayments() {
     setToast({ msg, type });
   }, []);
 
-  if (!token) {
-    return (
-      <div className="flex items-center justify-center h-64 text-slate-400 text-sm">
-        Please log in to continue.
-      </div>
-    );
-  }
+  if (!token) return (
+    <div className="flex items-center justify-center min-h-[60vh] text-slate-500 text-xs font-bold animate-pulse">
+        Access Link Offline — Authorization Required
+    </div>
+  );
 
   return (
-    <div className="space-y-6 p-1">
+    <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Wallet size={22} className="text-sky-500" />
+          <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+            <Wallet size={26} className="text-sky-400" />
             Payment Management
           </h2>
-          <p className="text-slate-400 text-sm mt-0.5">Review, approve, reject, and override payments</p>
+          <p className="text-slate-500 text-[10px] font-bold mt-1">Manage payments and history</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex p-1.5 bg-white/5 rounded-2xl w-fit border border-white/5 backdrop-blur-xl shadow-2xl">
         {[
-          { key: "pending", icon: <Clock size={15} />, label: "Pending" },
-          { key: "history", icon: <History size={15} />, label: "Full History" },
+          { key: "pending", icon: <Clock size={16} />, label: "Pending" },
+          { key: "history", icon: <History size={16} />, label: "History" },
         ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              tab === t.key
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            {t.icon} {t.label}
-          </button>
+                <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`flex items-center gap-3 px-8 py-3 rounded-xl text-[10px] font-bold transition-all duration-300 ${
+                      tab === t.key
+                        ? "bg-white text-black shadow-2xl scale-100"
+                        : "text-slate-500 hover:text-white"
+                    }`}
+                >
+                    {t.icon} {t.label}
+                </button>
         ))}
       </div>
 
       {/* Tab Content */}
-      {tab === "pending"
-        ? <PendingTab token={token} onToast={showToast} />
-        : <HistoryTab token={token} onToast={showToast} />
-      }
+      <div className="relative min-h-[50vh]">
+          <AnimatePresence mode="wait">
+            <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+            >
+                {tab === "pending"
+                    ? <PendingTab token={token} onToast={showToast} />
+                    : <HistoryTab token={token} onToast={showToast} />
+                }
+            </motion.div>
+          </AnimatePresence>
+      </div>
 
-      {toast && (
-        <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
-      )}
+      <AnimatePresence>
+        {toast && (
+            <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-

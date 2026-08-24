@@ -1,5 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
+import { Copy, ArrowUpRight, Search, Loader2, X, AlertTriangle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const formatProfilePic = (filename) => {
+    if (!filename) return null;
+    if (filename.startsWith("http")) return filename;
+    return `https://api.easysarvice.com/public/uploads/profile_pics/${filename}`;
+};
 
 export default function Withdraw() {
   const { token } = useAuth();
@@ -17,12 +25,7 @@ export default function Withdraw() {
   const [remarks, setRemarks] = useState("");
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    if (!token) return;
-    fetchWithdraws();
-  }, [token]);
-
-  const fetchWithdraws = async () => {
+  const fetchWithdraws = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -37,7 +40,12 @@ export default function Withdraw() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    fetchWithdraws();
+  }, [token, fetchWithdraws]);
 
   const openModal = (withdraw, action) => {
     setSelectedWithdraw(withdraw);
@@ -120,149 +128,205 @@ export default function Withdraw() {
     .filter((w) => w.status === "pending")
     .reduce((acc, w) => acc + (parseFloat(w.amount) || 0), 0);
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    alert("Copied: " + text);
+  };
+
   const totalApproved = withdraws
     .filter((w) => w.status === "approved")
     .reduce((acc, w) => acc + (parseFloat(w.amount) || 0), 0);
 
   const pendingCount = withdraws.filter((w) => w.status === "pending").length;
 
-  if (loading) return <div className="p-6 text-center text-slate-500">Loading withdrawals...</div>;
-  if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pulse">
+        <Loader2 className="animate-spin text-sky-400 mb-4" size={32} />
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Loading withdrawals...</span>
+    </div>
+  );
+
+  if (error) return (
+    <div className="p-8 rounded-3xl border border-red-500/20 bg-red-500/10 text-red-400 text-sm font-bold backdrop-blur-md flex items-center gap-3">
+        <AlertTriangle size={20} />
+        {error}
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-in fade-in duration-700">
       {/* Header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-800">Withdraw Management</h2>
-          <p className="text-sm text-slate-500 mt-1">Manage user withdrawal requests</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            <ArrowUpRight size={24} className="text-rose-400" />
+            Withdrawal Requests
+          </h1>
+          <p className="text-sm text-slate-400 font-medium">{withdraws.length} total withdrawal requests</p>
         </div>
-        <span className="text-sm text-slate-500">{withdraws.length} total requests</span>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[10px] font-bold text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+            <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+            Pending
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-          <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Pending Amount</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">৳{totalPending.toLocaleString()}</p>
-          <p className="text-sm text-yellow-600 mt-1">{pendingCount} pending request{pendingCount !== 1 ? "s" : ""}</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-          <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Approved Amount</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">৳{totalApproved.toLocaleString()}</p>
-          <p className="text-sm text-green-600 mt-1">Successfully processed</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-          <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Total Requests</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">{withdraws.length}</p>
-          <p className="text-sm text-slate-400 mt-1">All time</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {[
+          { label: "Total Pending", value: `৳${totalPending.toLocaleString()}`, sub: `${pendingCount} users waiting`, color: "text-amber-400", bg: "from-amber-500/20 to-orange-500/5", border: "border-amber-500/20" },
+          { label: "Total Approved", value: `৳${totalApproved.toLocaleString()}`, sub: "Successfully paid", color: "text-emerald-400", bg: "from-emerald-500/20 to-teal-500/5", border: "border-emerald-500/20" },
+          { label: "Total Requests", value: withdraws.length, sub: "Total requests overall", color: "text-sky-400", bg: "from-sky-500/20 to-blue-500/5", border: "border-sky-500/20" }
+        ].map(card => (
+          <div key={card.label} className={`group overflow-hidden rounded-3xl border ${card.border} bg-gradient-to-br ${card.bg} p-6 backdrop-blur-xl transition-all hover:scale-[1.02]`}>
+            <p className="text-[10px] font-bold text-slate-500">{card.label}</p>
+            <p className={`mt-3 text-3xl font-black ${card.color} tracking-tighter`}>{card.value}</p>
+            <p className="mt-2 text-[10px] font-bold text-slate-500">{card.sub}</p>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 flex flex-col sm:flex-row gap-3">
-        <input
-          type="text"
-          placeholder="Search by ID, name, mobile, method or account..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-700 placeholder:text-slate-400"
-        />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-sky-400 transition-colors" size={18} />
+            <input
+              type="text"
+              placeholder="Search via User, Mobile, or Method..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-6 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all group-hover:bg-white/[0.05]"
+            />
+        </div>
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-700 bg-white"
+          className="px-6 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 min-w-[180px] appearance-none cursor-pointer"
         >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
+          <option value="all" className="bg-[#121212]">ALL STATUSES</option>
+          <option value="pending" className="bg-[#121212]">PENDING</option>
+          <option value="approved" className="bg-[#121212]">APPROVED</option>
+          <option value="rejected" className="bg-[#121212]">REJECTED</option>
         </select>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white/[0.02] rounded-3xl border border-white/5 overflow-hidden backdrop-blur-xl shadow-2xl">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600 uppercase text-xs">
-              <tr>
-                <th className="px-4 py-3 whitespace-nowrap">ID</th>
-                <th className="px-4 py-3 whitespace-nowrap">User</th>
-                <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">Mobile</th>
-                <th className="px-4 py-3 whitespace-nowrap">Method</th>
-                <th className="px-4 py-3 whitespace-nowrap hidden md:table-cell">Account</th>
-                <th className="px-4 py-3 whitespace-nowrap">Amount</th>
-                <th className="px-4 py-3 whitespace-nowrap">Status</th>
-                <th className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">Date</th>
-                <th className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">Trx ID</th>
-                <th className="px-4 py-3 whitespace-nowrap text-right">Action</th>
+          <table className="min-w-full text-left text-xs">
+            <thead>
+              <tr className="bg-white/5 text-slate-500 text-[10px] font-bold">
+                <th className="px-6 py-4 whitespace-nowrap">ID</th>
+                <th className="px-6 py-4 whitespace-nowrap">User</th>
+                <th className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">Mobile</th>
+                <th className="px-6 py-4 whitespace-nowrap text-center">Method</th>
+                <th className="px-6 py-4 whitespace-nowrap hidden md:table-cell">Account No</th>
+                <th className="px-6 py-4 whitespace-nowrap">Amount</th>
+                <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                <th className="px-6 py-4 whitespace-nowrap hidden lg:table-cell">Date</th>
+                <th className="px-6 py-4 whitespace-nowrap hidden lg:table-cell">Transaction ID</th>
+                <th className="px-6 py-4 whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-white/5">
               {filtered.map((w) => (
-                <tr key={w.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900">#{w.id}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="font-medium text-slate-900">{w.full_name}</div>
-                    <div className="text-xs text-slate-500">{w.email}</div>
+                <tr key={w.id} className="group hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-4 font-mono text-[10px] text-slate-500 group-hover:text-slate-300">#{w.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center overflow-hidden shadow-lg">
+                            {w.profile_picture ? (
+                                <img src={formatProfilePic(w.profile_picture)} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-sky-400 font-black text-sm">{(w.full_name || "?").charAt(0)}</span>
+                            )}
+                        </div>
+                        <div>
+                            <div className="font-black text-white text-sm tracking-tight">{w.full_name}</div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">{w.email}</div>
+                        </div>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-600">{w.mobile}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="px-2 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 uppercase">
+                  <td className="px-6 py-4 hidden sm:table-cell">
+                    <div className="flex items-center gap-2 group/copy">
+                        <span className="text-slate-400 font-bold">{w.mobile}</span>
+                        <button onClick={() => copyToClipboard(w.mobile)} className="opacity-0 group-hover/copy:opacity-100 p-1.5 bg-white/5 rounded-lg text-sky-400 transition-all active:scale-90">
+                            <Copy size={12} />
+                        </button>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="px-3 py-1 rounded-lg text-[9px] font-black bg-white/5 text-slate-300 border border-white/10 uppercase tracking-widest">
                       {w.method}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell font-mono text-xs text-slate-600">
-                    {w.account_no}
+                  <td className="px-6 py-4 hidden md:table-cell">
+                    <div className="flex items-center gap-2 group/copy">
+                        <span className="font-mono text-slate-400 bg-black/20 px-2 py-1 rounded-lg border border-white/5">{w.account_no}</span>
+                        <button onClick={() => copyToClipboard(w.account_no)} className="opacity-0 group-hover/copy:opacity-100 p-1.5 bg-white/5 rounded-lg text-sky-400 transition-all active:scale-90">
+                            <Copy size={12} />
+                        </button>
+                    </div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap font-semibold text-slate-900">
+                  <td className="px-6 py-4 whitespace-nowrap font-black text-white text-sm tracking-tight">
                     ৳{parseFloat(w.amount).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-bold ${
+                      className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
                         w.status === "pending"
-                          ? "bg-yellow-100 text-yellow-700"
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
                           : w.status === "approved"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : "bg-red-500/10 text-red-400 border-red-500/20"
                       }`}
                     >
-                      {w.status?.charAt(0).toUpperCase() + w.status?.slice(1)}
+                      {w.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">
+                  <td className="px-6 py-4 hidden lg:table-cell text-slate-500 font-bold uppercase tracking-tighter">
                     {new Date(w.created_at).toLocaleDateString("en-GB")}
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell font-mono text-xs text-slate-500">
-                    {w.trx_id || "-"}
+                  <td className="px-6 py-4 hidden lg:table-cell">
+                    {w.trx_id ? (
+                        <div className="flex items-center gap-2 group/copy">
+                            <span className="font-mono text-[10px] text-sky-400">{w.trx_id}</span>
+                            <button onClick={() => copyToClipboard(w.trx_id)} className="opacity-0 group-hover/copy:opacity-100 p-1.5 bg-white/5 rounded-lg text-sky-400 transition-all active:scale-90">
+                                <Copy size={12} />
+                            </button>
+                        </div>
+                    ) : <span className="text-slate-700">—</span>}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-right">
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
                     {w.status === "pending" ? (
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-3">
                         <button
                           onClick={() => openModal(w, "approved")}
-                          className="px-3 py-1.5 rounded-md text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                          className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all active:scale-[0.98]"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => openModal(w, "rejected")}
-                          className="px-3 py-1.5 rounded-md text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                          className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all active:scale-[0.98]"
                         >
                           Reject
                         </button>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-400">Processed</span>
+                      <span className="text-[10px] font-bold text-slate-600">Completed</span>
                     )}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-slate-400">
-                    No withdrawal requests found
+                  <td colSpan={10} className="px-6 py-20 text-center opacity-40">
+                    <div className="flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 rounded-3xl border-2 border-dashed border-white/20 flex items-center justify-center mb-4">
+                            <span className="text-2xl">?</span>
+                        </div>
+                        <p className="text-[10px] font-bold">No withdrawals found</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -272,70 +336,89 @@ export default function Withdraw() {
       </div>
 
       {/* Modal */}
+      <AnimatePresence>
       {modalOpen && selectedWithdraw && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800">
-                {actionType === "approved" ? "Approve Withdrawal" : "Reject Withdrawal"}
-              </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                {selectedWithdraw.full_name} — ৳{parseFloat(selectedWithdraw.amount).toLocaleString()} via {selectedWithdraw.method}
-              </p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-[#121212] border border-white/10 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+
+            <div className="p-6 sm:p-8 border-b border-white/5 relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    {actionType === "approved" ? "Approve Withdrawal" : "Reject Withdrawal"}
+                </h3>
+                <button onClick={closeModal} className="p-2 rounded-xl bg-white/5 text-slate-400 hover:text-white transition-all"><X size={20} /></button>
+              </div>
+              <div className="px-6 py-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">User</span>
+                    <span className="text-xs font-black text-white">{selectedWithdraw.full_name}</span>
+                </div>
+                <div className="text-right">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Amount</span>
+                    <span className="text-sm font-black text-sky-400 block">৳{parseFloat(selectedWithdraw.amount).toLocaleString()}</span>
+                </div>
+              </div>
             </div>
 
-            <div className="p-4 sm:p-6 space-y-4">
+            <div className="p-8 space-y-6 relative z-10">
               {actionType === "approved" && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Transaction ID (TrxID) <span className="text-red-500">*</span>
+                  <label className="block text-[10px] font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">
+                    Transaction ID <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={trxId}
                     onChange={(e) => setTrxId(e.target.value)}
-                    placeholder="Enter bKash/Nagad TrxID"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    placeholder="Enter transaction ID..."
+                    className="w-full px-5 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Remarks {actionType === "rejected" && <span className="text-red-500">*</span>}
+                <label className="block text-[10px] font-black text-slate-500 mb-3 uppercase tracking-[0.2em]">
+                  Notes {actionType === "rejected" && <span className="text-red-500">*</span>}
                 </label>
                 <textarea
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder={actionType === "rejected" ? "Reason for rejection..." : "Optional notes..."}
                   rows={3}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  className="w-full px-5 py-4 rounded-2xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500/50 resize-none transition-all"
                 />
               </div>
             </div>
 
-            <div className="p-4 sm:p-6 border-t border-slate-100 flex justify-end gap-3">
+            <div className="p-8 border-t border-white/5 flex gap-4 relative z-10 bg-white/[0.01]">
               <button
                 onClick={closeModal}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-white border border-white/5 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitAction}
                 disabled={processing}
-                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+                className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-white shadow-lg transition-all ${
                   actionType === "approved"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-red-600 hover:bg-red-700"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    ? "bg-emerald-500 shadow-emerald-500/20 hover:bg-emerald-400"
+                    : "bg-red-500 shadow-red-500/20 hover:bg-red-400"
+                } disabled:opacity-50 active:scale-[0.98]`}
               >
-                {processing ? "Processing..." : actionType === "approved" ? "Confirm Approve" : "Confirm Reject"}
+                {processing ? "Executing..." : actionType === "approved" ? "Approve" : "Confirm Reject"}
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
