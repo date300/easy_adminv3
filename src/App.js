@@ -8,12 +8,13 @@ import Home from "./pages/Home";
 import Users from "./pages/Users";
 import Payments from "./pages/Payments";
 import Business from "./pages/Business";
-import Withdraw from "./pages/Withdraw";   // ← নতুন import
+import Withdraw from "./pages/Withdraw";
 import Product from "./pages/Product";
 import AdminJobs from "./pages/AdminJobs";
 import RoyaltySalary from "./pages/RoyaltySalary";
 import MatrixFund from "./pages/MatrixFund";
 import AutoMatrixQueue from "./pages/AutoMatrixQueue";
+import PaymentMethods from "./pages/PaymentMethods";
 
 function App() {
   return (
@@ -36,9 +37,10 @@ function App() {
             <Route path="home" element={<Home />} />
             <Route path="users" element={<Users />} />
             <Route path="payments" element={<Payments />} />
+            <Route path="payment-methods" element={<PaymentMethods />} />
             <Route path="business" element={<Business />} />
             <Route path="product" element={<Product />} />
-            <Route path="withdraw" element={<Withdraw />} />   {/* ← আলাদা component */}
+            <Route path="withdraw" element={<Withdraw />} />
             <Route path="admin/jobs" element={<AdminJobs />} />
             <Route path="royalty-salary" element={<RoyaltySalary />} />
             <Route path="matrix-fund" element={<MatrixFund />} />
@@ -54,4 +56,3 @@ function App() {
 }
 
 export default App;
-

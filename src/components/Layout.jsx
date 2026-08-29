@@ -23,6 +23,7 @@ export default function Layout() {
     { name: "Matrix Fund", path: "/matrix-fund", icon: <LayoutGrid size={20} /> },
     { name: "Users", path: "/users", icon: <Users size={20} /> },
     { name: "Payments", path: "/payments", icon: <CreditCard size={20} /> },
+    { name: "Payment Config", path: "/payment-methods", icon: <CreditCard size={20} /> },
     { name: "Products", path: "/product", icon: <Package size={20} /> },
     { name: "Businesses", path: "/business", icon: <Briefcase size={20} /> },
     { name: "Jobs", path: "/admin/jobs", icon: <Briefcase size={20} /> },
